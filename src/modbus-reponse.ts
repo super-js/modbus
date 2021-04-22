@@ -1,18 +1,27 @@
-
 export interface IModbusResponseOptions {
-    buffer: Buffer;
+    buffer?: Buffer;
+    expectedBufferSize: number;
 }
 
 export class ModbusResponse {
 
     private _buffer: Buffer;
+    private _isComplete: boolean = false;
+    private _expectedBufferSize: number;
+
+    private _data: number;
 
     constructor(options: IModbusResponseOptions) {
-        this._buffer = options.buffer;
+        this._buffer = options?.buffer || Buffer.alloc(0);
+        this._expectedBufferSize = options.expectedBufferSize;
     }
 
     static build(options: IModbusResponseOptions): ModbusResponse {
         return new ModbusResponse(options);
+    }
+
+    set buffer(buffer: Buffer) {
+        this._buffer = Buffer.concat([this._buffer, buffer]);
     }
 
     get buffer(): Buffer {
@@ -20,6 +29,10 @@ export class ModbusResponse {
     }
 
     get transactionId(): number {
-        return this._buffer.readUIntBE(0, 2)
+        return this._buffer.length > 2 ? this._buffer.readUIntBE(0, 2) : null;
+    }
+
+    get isComplete(): boolean {
+        return this._buffer.length === this._expectedBufferSize;
     }
 }

@@ -1,8 +1,6 @@
 import net from "net";
 import type {Socket} from "net";
 import {Buffer} from "buffer";
-
-import {MODBUS_FUNCTION_CODES} from "./codes";
 import {ModbusClient} from "./modbus-client";
 
 export interface IModbusTcpClientConnectOptions {
@@ -19,9 +17,6 @@ export interface IModbusTcpClientConstructionOptions extends IModbusTcpClientBui
 export class ModbusTcpClient extends ModbusClient {
 
     private _socket: Socket;
-
-    private _reconnectTimeout = null;
-    private _reconnectInterval: number = 5000;
 
     private readonly _connectionOptions: IModbusTcpClientConnectOptions = {
         host: '127.0.0.1', port: 502
@@ -44,46 +39,29 @@ export class ModbusTcpClient extends ModbusClient {
     async sendModbusRequest(modbusRequest) {
         return new Promise((resolve, reject) => {
             this._socket.write(modbusRequest.buffer, err => {
-                if(err) return reject(err);
+                if (err) return reject(err);
 
                 return resolve(true)
             })
         }) as Promise<boolean>
     }
 
-    _onError = (error: Error) => {
-        console.log(error.message);
-        this.tryReconnect()
-    }
-
-    _onEnd = () => {
-        console.log('end')
-    }
-
-    _onClose = () => {
-        console.log('closed');
-    }
-
     _onData = (buffer: Buffer) => {
         super.readModbusResponse(buffer)
     }
 
-    _onReady = () => {
-        super._isConnected = true;
-        clearTimeout(this._reconnectTimeout);
-        console.log('ready');
-    }
+    protected tryReconnect() {
+        if(this._socket) {
+            this._reconnectTimeout = setTimeout(() => {
+                if(!this._isConnected && !this._socket.connecting) {
 
-    private tryReconnect() {
-        this._reconnectTimeout = setTimeout(() => {
-            if(!this._isConnected && this._socket && !this._socket.connecting) {
-
-                this._socket.connect({
-                    host: this._connectionOptions.host,
-                    port: this._connectionOptions.port
-                })
-            }
-        }, this._reconnectInterval);
+                    this._socket.connect({
+                        host: this._connectionOptions.host,
+                        port: this._connectionOptions.port
+                    })
+                }
+            }, this._reconnectInterval);
+        }
     }
 
     createConnection(): Socket {
@@ -94,11 +72,11 @@ export class ModbusTcpClient extends ModbusClient {
             host, port
         });
 
-        this._socket.addListener('error', this._onError);
-        this._socket.addListener('end', this._onEnd);
-        this._socket.addListener('close', this._onClose);
+        this._socket.addListener('error', this.onError);
+        this._socket.addListener('end', this.onClose);
+        this._socket.addListener('close', this.onClose);
         this._socket.addListener('data', this._onData);
-        this._socket.addListener('ready', this._onReady);
+        this._socket.addListener('ready', this.onConnected);
 
         return this._socket;
 
@@ -112,15 +90,12 @@ export class ModbusTcpClient extends ModbusClient {
                 this._socket.destroy();
 
                 this._socket = null;
-                this._isConnected = false;
+
+                this.onClose();
 
                 return resolve();
             })
         })
-    }
-
-    get connected(): boolean {
-        return this._isConnected;
     }
 
 }

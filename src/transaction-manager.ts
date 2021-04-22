@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import {ModbusRequest} from "./modbus-request";
-import {ModbusResponse} from "./modbus-reponse";
+
+export class TransactionTimeoutError extends Error {}
 
 export class TransactionManager {
 
@@ -29,16 +30,35 @@ export class TransactionManager {
         this._transactions.set(transactionId, modbusRequest);
     }
 
-    waitForTransaction(transactionId: number) {
+    updateTransaction(transactionId: number, responseBuffer: Buffer): boolean {
+        const modbusRequest = this._transactions.get(transactionId);
+
+        if(modbusRequest) {
+            modbusRequest.updateResponseBuffer(responseBuffer);
+            return modbusRequest.isComplete;
+        }
+
+        return false;
+    }
+
+    waitForTransaction(transactionId: number, timeout: number = 5000) {
+
+        let maxNoOfRetries = timeout / 500;
+        let noOfRetries = 0;
+
         return new Promise((resolve, reject) => {
 
             const checkTransactionStatus = () => {
-                const transaction = this._transactions.get(transactionId);
+                const modbusRequest = this._transactions.get(transactionId);
 
-                if(!transaction || transaction.response) {
+                if(!modbusRequest || modbusRequest.isComplete) {
                     this._transactions.delete(transactionId);
                     return resolve(true)
-                };
+                }
+
+                noOfRetries++;
+
+                if(noOfRetries >= maxNoOfRetries) return reject(new TransactionTimeoutError(`Transaction ID ${transactionId} timed out.`))
 
                 setTimeout(checkTransactionStatus, 500);
             }
@@ -47,18 +67,5 @@ export class TransactionManager {
 
         })
     }
-
-    resolveTransaction(transactionId: number, modbusResponse: ModbusResponse): boolean {
-        const modbusRequest = this._transactions.get(transactionId);
-
-        if(modbusRequest) {
-            modbusRequest.response = modbusResponse;
-            return true;
-        }
-
-        return false;
-    }
-
-
 
 }

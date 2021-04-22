@@ -1,68 +1,114 @@
-import {MODBUS_FUNCTION_CODES} from "./codes";
-import {BaseFunctionCode} from "./codes/base-function-code";
+// import {MODBUS_FUNCTION_CODES} from "./codes";
+// import {BaseFunctionCode} from "./codes/base-function-code";
 import {TransactionManager} from "./transaction-manager";
-import {ModbusRequest} from "./modbus-request";
+import {
+    ModbusRequest,
+    WriteHoldingRegisterRequest,
+    ReadCoilsRequest,
+    ReadHoldingRegisterRequest
+} from "./modbus-request";
 import {Buffer} from "buffer";
 import {ModbusResponse} from "./modbus-reponse";
-
-export type TFunctionCodes = {[key in keyof typeof MODBUS_FUNCTION_CODES]: BaseFunctionCode};
+import {getTransactionIdFromBuffer} from "./utils";
 
 export class ModbusClientNotConnected extends Error {
     constructor() {
         super('Unable to perform the operation, ModbusClient not connected to Slave.');
     }
+}
 
+export interface IModbusClientResult<T extends ModbusRequest = any> {
+    modbusRequest: T;
 }
 
 export abstract class ModbusClient {
 
     protected _isConnected: boolean = false;
-    protected functionCodes: TFunctionCodes = {} as TFunctionCodes;
     protected transactionManager: TransactionManager = new TransactionManager();
 
-    protected constructor() {
-        Object.keys(MODBUS_FUNCTION_CODES).forEach(async modbusFunctionCodeName => {
-            this.functionCodes[modbusFunctionCodeName] = await MODBUS_FUNCTION_CODES[modbusFunctionCodeName].build()
-        })
-    }
+    protected _reconnectTimeout = null;
+    protected _reconnectInterval: number = 5000;
 
     protected abstract sendModbusRequest(modbusRequest: ModbusRequest): Promise<boolean>;
+    protected abstract tryReconnect(): void;
 
-    protected async readModbusResponse(buffer: Buffer) {
+    private _currentResponseBuffer?: Buffer;
 
-        const modbusResponse = ModbusResponse.build({
-            buffer
-        })
-
-        this.transactionManager.resolveTransaction(modbusResponse.transactionId, modbusResponse);
+    protected onError = (error: Error) => {
+        console.warn(`An error occurred in Modbus Client : ${error.message}`);
+        if(!this._isConnected) this.tryReconnect();
     }
 
-    private async execute(handler: BaseFunctionCode, options: any): Promise<ModbusResponse> {
-        if(this._isConnected && handler) {
+    protected onConnected = () => {
+        this._isConnected = true;
+        clearTimeout(this._reconnectTimeout)
+    }
 
-            const transactionId = this.transactionManager.allocateTransaction();
+    protected onClose = () => {
+        this._isConnected = false;
+        this.tryReconnect();
+    }
 
-            const modbusRequest = handler.createRequest({
-                ...options,
-                transactionId: transactionId
-            });
+    protected async readModbusResponse(buffer: Buffer) {
+        if(!this._currentResponseBuffer) this._currentResponseBuffer = buffer;
 
-            this.transactionManager.setTransaction(transactionId, modbusRequest);
+        const transactionId = getTransactionIdFromBuffer(this._currentResponseBuffer)
+
+        const isTransactionComplete = this.transactionManager.updateTransaction(
+            transactionId, this._currentResponseBuffer
+        );
+
+        if(isTransactionComplete) {
+            this._currentResponseBuffer = null;
+        }
+    }
+
+    private async execute(modbusRequest: ModbusRequest): Promise<any> {
+        if(this._isConnected) {
+
+            this.transactionManager.setTransaction(modbusRequest.transactionId, modbusRequest);
 
             await Promise.all([
                 this.sendModbusRequest(modbusRequest),
-                this.transactionManager.waitForTransaction(transactionId)
+                this.transactionManager.waitForTransaction(modbusRequest.transactionId)
             ])
 
-            return modbusRequest.response;
+            return modbusRequest.result;
 
         } else {
             throw new ModbusClientNotConnected();
         }
     }
 
-    async writeHoldingRegister(address: number, value: number, unitId?: number) {
-        const handler = this.functionCodes['WRITE_HOLDING_REGISTER'];
-        return this.execute(handler, {address, value, unitId})
+    get isConnected() {
+        return this._isConnected;
     }
+
+    async readCoils(address: number, length: number, unitId?: number): Promise<IModbusClientResult<ReadCoilsRequest>> {
+        return this.execute(ReadCoilsRequest.build({
+            address,
+            data: length,
+            unitId,
+            transactionId: this.transactionManager.allocateTransaction()
+        }))
+    }
+
+    async readHoldingRegisters(address: number, length: number, unitId?: number): Promise<number[]> {
+        return this.execute(ReadHoldingRegisterRequest.build({
+            address,
+            data: length,
+            unitId,
+            transactionId: this.transactionManager.allocateTransaction()
+        }));
+    }
+
+    async writeHoldingRegister(address: number, value: number, unitId?: number): Promise<IModbusClientResult<WriteHoldingRegisterRequest>> {
+        return this.execute(WriteHoldingRegisterRequest.build({
+            address,
+            data: value,
+            unitId,
+            transactionId: this.transactionManager.allocateTransaction()
+        }))
+    }
+
 }
