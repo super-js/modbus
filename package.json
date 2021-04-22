@@ -20,5 +20,9 @@
     "build": "yarn run clean && npx tsc -p tsconfig.json",
     "clean": "npx rimraf lib/**/*",
     "test": "yarn jest"
+  },
+  "dependencies": {
+    "@types/serialport": "^8.0.1",
+    "serialport": "^9.0.7"
   }
 }

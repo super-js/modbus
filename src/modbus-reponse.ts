@@ -6,10 +6,7 @@ export interface IModbusResponseOptions {
 export class ModbusResponse {
 
     private _buffer: Buffer;
-    private _isComplete: boolean = false;
-    private _expectedBufferSize: number;
-
-    private _data: number;
+    private readonly _expectedBufferSize: number;
 
     constructor(options: IModbusResponseOptions) {
         this._buffer = options?.buffer || Buffer.alloc(0);

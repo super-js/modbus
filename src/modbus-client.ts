@@ -1,5 +1,5 @@
-// import {MODBUS_FUNCTION_CODES} from "./codes";
-// import {BaseFunctionCode} from "./codes/base-function-code";
+import {Buffer} from "buffer";
+
 import {TransactionManager} from "./transaction-manager";
 import {
     ModbusRequest,
@@ -7,18 +7,12 @@ import {
     ReadCoilsRequest,
     ReadHoldingRegisterRequest
 } from "./modbus-request";
-import {Buffer} from "buffer";
-import {ModbusResponse} from "./modbus-reponse";
 import {getTransactionIdFromBuffer} from "./utils";
 
 export class ModbusClientNotConnected extends Error {
     constructor() {
         super('Unable to perform the operation, ModbusClient not connected to Slave.');
     }
-}
-
-export interface IModbusClientResult<T extends ModbusRequest = any> {
-    modbusRequest: T;
 }
 
 export abstract class ModbusClient {
@@ -31,6 +25,9 @@ export abstract class ModbusClient {
 
     protected abstract sendModbusRequest(modbusRequest: ModbusRequest): Promise<boolean>;
     protected abstract tryReconnect(): void;
+    protected abstract createConnection(): void;
+
+    abstract close(): Promise<void>;
 
     private _currentResponseBuffer?: Buffer;
 
@@ -84,7 +81,7 @@ export abstract class ModbusClient {
         return this._isConnected;
     }
 
-    async readCoils(address: number, length: number, unitId?: number): Promise<IModbusClientResult<ReadCoilsRequest>> {
+    async readCoils(address: number, length: number, unitId?: number): Promise<boolean[]> {
         return this.execute(ReadCoilsRequest.build({
             address,
             data: length,
@@ -102,7 +99,7 @@ export abstract class ModbusClient {
         }));
     }
 
-    async writeHoldingRegister(address: number, value: number, unitId?: number): Promise<IModbusClientResult<WriteHoldingRegisterRequest>> {
+    async writeHoldingRegister(address: number, value: number, unitId?: number): Promise<void> {
         return this.execute(WriteHoldingRegisterRequest.build({
             address,
             data: value,

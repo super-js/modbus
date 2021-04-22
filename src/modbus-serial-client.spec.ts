@@ -1,21 +1,21 @@
 jest.setTimeout(30000)
 
-import {ModbusTcpClient} from "./modbus-tcp-client";
+import {ModbusSerialClient} from "./modbus-serial-client";
 
-describe('ModbusTcpClient', function () {
+describe('ModbusSerialClient', function () {
 
-    let modbusTcpClient: ModbusTcpClient;
+    let modbusSerialClient: ModbusSerialClient;
 
     beforeAll(async () => {
-        modbusTcpClient = await ModbusTcpClient.build({
-            host: '127.0.0.1', port: 502
+        modbusSerialClient = await ModbusSerialClient.build({
+            port: 'COM1'
         })
     })
 
     it('should connect', async () => {
         const isConnected = await new Promise((resolve, reject) => {
             setTimeout(() => {
-                return resolve(modbusTcpClient.isConnected)
+                return resolve(modbusSerialClient.isConnected)
             }, 1000);
         });
 
@@ -51,7 +51,7 @@ describe('ModbusTcpClient', function () {
 
     it('readCoils', async () => {
 
-        const result = await modbusTcpClient.readCoils(0, 10);
+        const result = await modbusSerialClient.readCoils(0, 10);
 
         console.log(result)
 

@@ -12,8 +12,6 @@ export interface IModbusRequestOptions {
     expectedResponseBodySize: number;
 }
 
-export type TModbusRequestStatus = 'READY' | 'PROCESSING' | 'COMPLETED';
-
 export class BuildModbusRequestError extends Error {
 
 }
@@ -24,17 +22,16 @@ export abstract class ModbusRequest {
     protected static FUNCTION_CODE = 0x00;
     protected static readonly MODBUS_HEADER_SIZE = 7;
 
-    private _header: Buffer;
-    private _message: Buffer;
+    private readonly _header: Buffer;
+    private readonly _message: Buffer;
 
-    private _unitId: number;
-    private _address: number;
-    private _transactionId: number;
-    private _data: number;
-    private _functionCode: number;
+    private readonly _unitId: number;
+    private readonly _address: number;
+    private readonly _transactionId: number;
+    private readonly _data: number;
+    private readonly _functionCode: number;
 
-    private _status: TModbusRequestStatus = 'READY';
-    private _response?: ModbusResponse;
+    private readonly _response?: ModbusResponse;
 
     abstract get result(): any;
 
@@ -72,14 +69,6 @@ export abstract class ModbusRequest {
 
     get buffer(): Buffer {
         return Buffer.concat([this._header, this._message])
-    }
-
-    get status(): TModbusRequestStatus {
-        return this._status
-    }
-
-    set status(status: TModbusRequestStatus) {
-        this._status = status;
     }
 
     get transactionId(): number {

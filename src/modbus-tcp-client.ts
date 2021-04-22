@@ -36,6 +36,22 @@ export class ModbusTcpClient extends ModbusClient {
         return modbusTcpClient;
     }
 
+    protected createConnection(): void {
+
+        const {host, port = 502} = this._connectionOptions;
+
+        this._socket = net.createConnection({
+            host, port
+        });
+
+        this._socket.addListener('error', this.onError);
+        this._socket.addListener('end', this.onClose);
+        this._socket.addListener('close', this.onClose);
+        this._socket.addListener('data', this._onData);
+        this._socket.addListener('ready', this.onConnected);
+
+    }
+
     async sendModbusRequest(modbusRequest) {
         return new Promise((resolve, reject) => {
             this._socket.write(modbusRequest.buffer, err => {
@@ -62,24 +78,6 @@ export class ModbusTcpClient extends ModbusClient {
                 }
             }, this._reconnectInterval);
         }
-    }
-
-    createConnection(): Socket {
-
-        const {host, port = 502} = this._connectionOptions;
-
-        this._socket = net.createConnection({
-            host, port
-        });
-
-        this._socket.addListener('error', this.onError);
-        this._socket.addListener('end', this.onClose);
-        this._socket.addListener('close', this.onClose);
-        this._socket.addListener('data', this._onData);
-        this._socket.addListener('ready', this.onConnected);
-
-        return this._socket;
-
     }
 
     async close(): Promise<void> {
