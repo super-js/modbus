@@ -1,3 +1,2 @@
-export * from "./modbus-tcp-client";
+export * from "./clients";
 export * from "./modbus-manager";
-export * from "./modbus-serial-client";

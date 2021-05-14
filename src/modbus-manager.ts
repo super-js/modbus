@@ -1,5 +1,4 @@
-import {IModbusTcpClientBuildOptions, ModbusTcpClient} from "./modbus-tcp-client";
-import {ModbusClient} from "./modbus-client";
+import {IModbusTcpClientBuildOptions, ModbusTcpClient, ModbusClient} from "./clients";
 
 export interface IModbusManagerOptions {
 
@@ -15,19 +14,23 @@ export class InvalidModbusClientTypeError extends Error {
 
 }
 
-export class ModbusManager {
+export interface IModbusManager {
+    [connectionName: string]: ModbusClient
+}
 
-    private _modbusClients: {[name: string]: ModbusClient} = {};
+export class ModbusManager<T extends IModbusManager = IModbusManager> {
 
-    constructor(options: IModbusManagerOptions) {
+    private _modbusClients: T = {} as T;
+
+    constructor(options?: IModbusManagerOptions) {
     }
 
-    addModbusClient = async (connectionName: string, type: TModbusClientType, options: IModbusTcpClientBuildOptions): Promise<ModbusClient> => {
+    addModbusClient = async (connectionName: keyof T, type: TModbusClientType, options: IModbusTcpClientBuildOptions): Promise<ModbusClient> => {
 
         if(MODBUS_CLIENT_TYPES.hasOwnProperty(type)) {
             const modbusClient = await MODBUS_CLIENT_TYPES[type].build(options);
 
-            this._modbusClients[connectionName] = modbusClient;
+            this._modbusClients[connectionName] = modbusClient as any;
 
             return modbusClient;
         } else {
@@ -36,15 +39,19 @@ export class ModbusManager {
 
     }
 
-    getModbusClient = (connectionName: string): ModbusClient => {
+    getModbusClient = (connectionName: keyof T): ModbusClient => {
         return this._modbusClients[connectionName];
     }
 
-    removeModbusClient = async (connectionName: string): Promise<void> => {
+    removeModbusClient = async (connectionName: keyof T): Promise<boolean> => {
         const modbusClient = this._modbusClients[connectionName];
         if(modbusClient) {
             await modbusClient.close();
             this._modbusClients[connectionName] = undefined;
+
+            return true;
         }
+
+        return false;
     }
 }

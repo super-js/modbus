@@ -7,7 +7,7 @@ export interface IModbusRequestOptions {
     unitId?: number;
     address: number;
     transactionId: number;
-    data: number;
+    data: any;
     functionCode: number;
     expectedResponseBodySize: number;
 }
@@ -28,7 +28,7 @@ export abstract class ModbusRequest {
     private readonly _unitId: number;
     private readonly _address: number;
     private readonly _transactionId: number;
-    private readonly _data: number;
+    private readonly _data: any;
     private readonly _functionCode: number;
 
     private readonly _response?: ModbusResponse;

@@ -1,13 +1,14 @@
 import {Buffer} from "buffer";
 
-import {TransactionManager} from "./transaction-manager";
+import {TransactionManager} from "../transaction-manager";
 import {
     ModbusRequest,
     WriteHoldingRegisterRequest,
     ReadCoilsRequest,
     ReadHoldingRegisterRequest
-} from "./modbus-request";
-import {getTransactionIdFromBuffer} from "./utils";
+} from "../modbus-request";
+import {getTransactionIdFromBuffer} from "../utils";
+import {WriteMultipleHoldingRegistersRequest} from "../modbus-request/write-multiple-holding-registers";
 
 export class ModbusClientNotConnected extends Error {
     constructor() {
@@ -41,9 +42,9 @@ export abstract class ModbusClient {
         clearTimeout(this._reconnectTimeout)
     }
 
-    protected onClose = () => {
+    protected onClose = (skipReconnect?: boolean) => {
         this._isConnected = false;
-        this.tryReconnect();
+        if(!skipReconnect) this.tryReconnect();
     }
 
     protected async readModbusResponse(buffer: Buffer) {
@@ -107,5 +108,15 @@ export abstract class ModbusClient {
             transactionId: this.transactionManager.allocateTransaction()
         }))
     }
+
+    async writeMultipleHoldingRegisters(address: number, values: number[], unitId?: number): Promise<void> {
+        return this.execute(WriteMultipleHoldingRegistersRequest.build({
+            address,
+            data: values,
+            unitId,
+            transactionId: this.transactionManager.allocateTransaction()
+        }))
+    }
+
 
 }

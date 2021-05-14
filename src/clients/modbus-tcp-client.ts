@@ -82,17 +82,25 @@ export class ModbusTcpClient extends ModbusClient {
 
     async close(): Promise<void> {
         return new Promise((resolve, reject) => {
-            this._socket.end(() => {
 
-                this._socket.emit('end');
+            const _destroy = () => {
                 this._socket.destroy();
-
                 this._socket = null;
-
-                this.onClose();
-
+                this.onClose(true);
                 return resolve();
-            })
+            }
+
+            if(this.isConnected) {
+                this._socket.end(() => {
+                    this._socket.emit('end');
+                    _destroy();
+                })
+            } else {
+                if(this._socket) _destroy();
+                return resolve();
+            }
+
+
         })
     }
 
