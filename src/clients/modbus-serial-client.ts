@@ -5,6 +5,11 @@ export interface IModbusSerialClientOptions {
     port: string;
 }
 
+export interface IModbusSerialClientBuildOptions extends IModbusSerialClientOptions {
+    waitForConnection?: boolean;
+    waitForConnectionTimeout?: number;
+}
+
 export class ModbusSerialClient extends ModbusClient {
 
     private _portConnection: SerialPort;
@@ -16,10 +21,14 @@ export class ModbusSerialClient extends ModbusClient {
         this._portName = options.port;
     }
 
-    static async build(options: IModbusSerialClientOptions) {
-        const modbusSerialClient = new ModbusSerialClient(options);
+    static async build(options: IModbusSerialClientBuildOptions) {
 
+        const {waitForConnection = false, waitForConnectionTimeout = 30, ...rest} = options;
+
+        const modbusSerialClient = new ModbusSerialClient(rest);
         modbusSerialClient.createConnection();
+
+        if(waitForConnection) await modbusSerialClient.waitForConnection(waitForConnectionTimeout);
 
         return modbusSerialClient;
     }
@@ -30,7 +39,7 @@ export class ModbusSerialClient extends ModbusClient {
         });
 
         this._portConnection.on('open', this.onConnected);
-        this._portConnection.on('data', super.readModbusResponse);
+        this._portConnection.on('data', super.onDataReceived);
     }
 
     async sendModbusRequest(modbusRequest) {
@@ -58,7 +67,7 @@ export class ModbusSerialClient extends ModbusClient {
             this._portConnection.close((err) => {
                 this._portConnection.destroy();
                 this._portConnection = null;
-                this.onClose();
+                this.onClose(true);
                 return resolve();
             })
         })

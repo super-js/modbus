@@ -1,0 +1,1 @@
+export const MAX_CONTIGUOUS_REGISTERS = 123;

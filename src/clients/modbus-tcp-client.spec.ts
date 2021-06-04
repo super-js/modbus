@@ -6,56 +6,109 @@ describe('ModbusTcpClient', function () {
 
     let modbusTcpClient: ModbusTcpClient;
 
-    beforeAll(async () => {
-        modbusTcpClient = await ModbusTcpClient.build({
-            host: '127.0.0.1', port: 502
-        })
-    })
+    const getModbusTcpClient = () => ModbusTcpClient.build({
+        waitForConnection: true, waitForConnectionTimeout: 30,
+        host: '127.0.0.1', port: 502
+    });
 
-    it('should connect', async () => {
-        const isConnected = await new Promise((resolve, reject) => {
-            setTimeout(() => {
-                return resolve(modbusTcpClient.isConnected)
-            }, 1000);
+    it('should wait for connection', async () => {
+        const modbusClient = await ModbusTcpClient.build({
+            waitForConnection: true, waitForConnectionTimeout: 30,
+            host: '127.0.0.1', port: 502
         });
 
-        expect(isConnected).toBe(true);
+        expect(modbusClient.isConnected).toBeTruthy();
+    });
+
+    it('should fail to connect', async () => {
+        expect(async () => {
+            await ModbusTcpClient.build({
+                waitForConnection: true, waitForConnectionTimeout: 30,
+                host: '227.0.21.1', port: 502
+            });
+        }).toThrowError();
+    });
+
+    it('writeMultipleHoldingRegisters', async () => {
+
+        const client = await getModbusTcpClient();
+
+        const results = await client.writeMultipleHoldingRegisters(
+            0,
+            new Array(100).fill(11),
+            {maxSimultaneousBatches: 100}
+        );
+
+        expect(results.length).toBe(1)
+
     });
 
     it('writeHoldingRegister', async () => {
 
-        // await Promise.all([
-        //     modbusTcpClient.writeHoldingRegister(0, 1, ),
-        //     modbusTcpClient.writeHoldingRegister(1, 2, ),
-        //     modbusTcpClient.writeHoldingRegister(2, 3, ),
-        //     modbusTcpClient.writeHoldingRegister(3, 4, ),
-        //     modbusTcpClient.writeHoldingRegister(4, 5, ),
-        //     modbusTcpClient.writeHoldingRegister(5, 6, ),
-        //     modbusTcpClient.writeHoldingRegister(6, 7, ),
-        //     modbusTcpClient.writeHoldingRegister(7, 8, ),
-        //     modbusTcpClient.writeHoldingRegister(8, 9, ),
-        //     modbusTcpClient.writeHoldingRegister(9, 10, ),
-        //     modbusTcpClient.readCoils(0, 4),
-        //     modbusTcpClient.readCoils(0, 4),
-        //     modbusTcpClient.readCoils(0, 4),
-        //     modbusTcpClient.readCoils(0, 4),
-        //     modbusTcpClient.readCoils(0, 4),
-        //     modbusTcpClient.readCoils(0, 4),
-        //     modbusTcpClient.readCoils(0, 4),
-        //     modbusTcpClient.readCoils(0, 4),
-        //     modbusTcpClient.readCoils(0, 4)
-        // ]);
+        const client = await getModbusTcpClient();
 
-        expect(true).toBe(true);
+        const result = await client.writeHoldingRegister(
+            100,
+            55
+        );
+
+        console.log(result.toJSON())
+
+        expect(result.address === 100 && result.value === 55).toBeTruthy()
+
+    });
+
+    it('readHoldingRegisters', async () => {
+
+        const client = await getModbusTcpClient();
+
+        const result = await client.readHoldingRegisters(
+            100,
+            55
+        );
+        expect(result.values.length === 55).toBeTruthy();
+
+    });
+
+    it('readInputRegisters', async () => {
+
+        const client = await getModbusTcpClient();
+
+        const result = await client.readInputRegisters(
+            100,
+            55
+        );
+
+        expect(result.values.length === 55).toBeTruthy();
+
     });
 
     it('readCoils', async () => {
 
-        const result = await modbusTcpClient.readCoils(0, 10);
+        const client = await getModbusTcpClient();
 
-        console.log(result)
+        const result = await client.readCoils(
+            0,
+            10
+        );
 
-        expect(result).not.toBe(null);
+        expect(result.values.length === 10).toBeTruthy()
+
+    });
+
+    it('readDiscreteInputs', async () => {
+
+        const client = await getModbusTcpClient();
+
+        const result = await client.readDiscreteInputs(
+            0,
+            10
+        );
+
+        console.log(result.toJSON())
+
+        expect(result.values.length === 10).toBeTruthy()
+
     });
 
 });

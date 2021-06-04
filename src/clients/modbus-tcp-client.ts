@@ -6,10 +6,12 @@ import {ModbusClient} from "./modbus-client";
 export interface IModbusTcpClientConnectOptions {
     host: string;
     port?: number;
+    timeout?: number;
 }
 
 export interface IModbusTcpClientBuildOptions extends IModbusTcpClientConnectOptions {
-
+    waitForConnection?: boolean;
+    waitForConnectionTimeout?: number;
 }
 
 export interface IModbusTcpClientConstructionOptions extends IModbusTcpClientBuildOptions {}
@@ -29,24 +31,29 @@ export class ModbusTcpClient extends ModbusClient {
     }
 
     static async build(options: IModbusTcpClientBuildOptions) {
-        const modbusTcpClient = new ModbusTcpClient(options);
+        const {waitForConnection = false, waitForConnectionTimeout = 30, ...rest} = options;
+
+        const modbusTcpClient = new ModbusTcpClient(rest);
 
         modbusTcpClient.createConnection();
+
+        if(waitForConnection) await modbusTcpClient.waitForConnection(waitForConnectionTimeout);
 
         return modbusTcpClient;
     }
 
     protected createConnection(): void {
 
-        const {host, port = 502} = this._connectionOptions;
+        const {host, port = 502, timeout = 30} = this._connectionOptions;
 
         this._socket = net.createConnection({
-            host, port
+            host, port, timeout: timeout * 1000
         });
 
         this._socket.addListener('error', this.onError);
         this._socket.addListener('end', this.onClose);
         this._socket.addListener('close', this.onClose);
+        this._socket.addListener('timeout', this.onClose);
         this._socket.addListener('data', this._onData);
         this._socket.addListener('ready', this.onConnected);
 
@@ -56,14 +63,13 @@ export class ModbusTcpClient extends ModbusClient {
         return new Promise((resolve, reject) => {
             this._socket.write(modbusRequest.buffer, err => {
                 if (err) return reject(err);
-
                 return resolve(true)
-            })
+            });
         }) as Promise<boolean>
     }
 
     _onData = (buffer: Buffer) => {
-        super.readModbusResponse(buffer)
+        super.onDataReceived(buffer)
     }
 
     protected tryReconnect() {

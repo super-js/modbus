@@ -1,13 +1,23 @@
 import crypto from "crypto";
-import {ModbusRequest} from "./modbus-request";
+import {ModbusRequest} from "./function-codes";
 
 export class TransactionTimeoutError extends Error {}
+
+export interface IUpdateTransactionResult {
+    isComplete: boolean;
+    restOfBuffer: Buffer;
+}
 
 export class TransactionManager {
 
     private _transactions: Map<number, ModbusRequest> = new Map();
+    private _currentTransactionResponse?: ModbusRequest = null;
 
     constructor() {}
+
+    static getTransactionIdFromBuffer(buffer: Buffer): number {
+        return buffer.length > 2 ? buffer.readUIntBE(0, 2) : null;
+    }
 
     private generateTransactionId(): number {
         const transactionId = crypto.randomBytes(2).readUInt16BE(0);
@@ -17,6 +27,9 @@ export class TransactionManager {
         return transactionId;
     }
 
+    doesTransactionExist(transactionId: number): boolean {
+        return this._transactions.has(transactionId);
+    }
 
     allocateTransaction(): number {
         const transactionId = this.generateTransactionId();
@@ -30,15 +43,23 @@ export class TransactionManager {
         this._transactions.set(transactionId, modbusRequest);
     }
 
-    updateTransaction(transactionId: number, responseBuffer: Buffer): boolean {
-        const modbusRequest = this._transactions.get(transactionId);
+    tryUpdateTransaction(responseBuffer: Buffer): Buffer {
+        if(this._currentTransactionResponse) {
+            const restOfResponseBuffer = this._currentTransactionResponse.updateResponseBuffer(responseBuffer);
 
-        if(modbusRequest) {
-            modbusRequest.updateResponseBuffer(responseBuffer);
-            return modbusRequest.isComplete;
+            if(restOfResponseBuffer.length === 0) this._currentTransactionResponse = null;
+
+            return restOfResponseBuffer;
+
+        } else {
+            const transactionId = TransactionManager.getTransactionIdFromBuffer(responseBuffer);
+            const transaction = this._transactions.get(transactionId);
+
+            // Invalid response buffer so clear the response buffer
+            if(!transaction) return Buffer.alloc(0)
+
+            return transaction.updateResponseBuffer(responseBuffer);
         }
-
-        return false;
     }
 
     waitForTransaction(transactionId: number, timeout: number = 5000) {
@@ -53,12 +74,24 @@ export class TransactionManager {
 
                 if(!modbusRequest || modbusRequest.isComplete) {
                     this._transactions.delete(transactionId);
-                    return resolve(true)
+
+                    if(modbusRequest.shouldThrowErrorOnException && modbusRequest.response.hasError) {
+                        throw new Error(`Transaction ID ${transactionId} failed - ${modbusRequest.response.exceptionName}`)
+                    } else {
+                        return resolve(true)
+                    }
                 }
 
                 noOfRetries++;
 
-                if(noOfRetries >= maxNoOfRetries) return reject(new TransactionTimeoutError(`Transaction ID ${transactionId} timed out.`))
+                if(noOfRetries >= maxNoOfRetries) {
+                    modbusRequest.increaseNoOfRetries(transactionId);
+                    this._transactions.delete(transactionId);
+
+                    if(!modbusRequest.failed) return resolve(false);
+
+                    return reject(new TransactionTimeoutError(`Transaction ID ${transactionId} timed out after ${modbusRequest.noOfRetries} retries.`));
+                }
 
                 setTimeout(checkTransactionStatus, 500);
             }
@@ -66,6 +99,10 @@ export class TransactionManager {
             checkTransactionStatus();
 
         })
+    }
+
+    get currentTransactionResponseInProgress(): ModbusRequest {
+        return this._currentTransactionResponse;
     }
 
 }
