@@ -17,15 +17,13 @@ import {
     IReadCoilsClientOptions,
     IReadInputRegistersClientOptions,
     ReadInputRegistersResponse,
-    ReadInputRegistersRequest
+    ReadInputRegistersRequest, WriteMultipleCoilsResponse, IWriteMultipleCoilsClientOptions,
+    IReadDiscreteInputsClientOptions,
+    ReadDiscreteInputsRequest,
+    ReadDiscreteInputsResponse, WriteMultipleCoilsRequest
 } from "../function-codes";
 
 import * as config from "../config";
-import {
-    IReadDiscreteInputsClientOptions,
-    ReadDiscreteInputsRequest,
-    ReadDiscreteInputsResponse
-} from "../function-codes/read-discrete-input";
 
 export interface IGetUnitIdAndOptions<T = IModbusRequestClientOptions> {
     unitId: number;
@@ -195,6 +193,19 @@ export abstract class ModbusClient {
         return this.execute<WriteHoldingRegisterResponse>(new WriteHoldingRegisterRequest({
             address,
             data: value,
+            unitId: unitId || _options.unitId,
+            transactionId: this.transactionManager.allocateTransaction(),
+            ..._options
+        }));
+    }
+
+    async writeMultipleCoils(address: number, values: boolean[], options?: number | IWriteMultipleCoilsClientOptions): Promise<WriteMultipleCoilsResponse> {
+
+        const {unitId, _options} = ModbusClient.getUnitIdAndOptions<WriteMultipleCoilsResponse>(options);
+
+        return this.execute<WriteMultipleCoilsResponse>(new WriteMultipleCoilsRequest({
+            address,
+            data: values,
             unitId: unitId || _options.unitId,
             transactionId: this.transactionManager.allocateTransaction(),
             ..._options

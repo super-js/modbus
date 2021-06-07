@@ -50,6 +50,8 @@ export class ModbusTcpClient extends ModbusClient {
             host, port, timeout: timeout * 1000
         });
 
+        this._socket.setKeepAlive(true);
+
         this._socket.addListener('error', this.onError);
         this._socket.addListener('end', this.onClose);
         this._socket.addListener('close', this.onClose);

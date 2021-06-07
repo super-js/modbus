@@ -5,4 +5,5 @@ export * from "./read-holding-registers";
 export * from "./write-multiple-holding-registers";
 export * from "./modbus-reponse";
 export * from "./read-discrete-input";
-export * from "./read-input-registers"
+export * from "./read-input-registers";
+export * from "./write-multiple-coils";

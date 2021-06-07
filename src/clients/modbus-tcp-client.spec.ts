@@ -43,6 +43,21 @@ describe('ModbusTcpClient', function () {
 
     });
 
+    it('writeCoils', async () => {
+
+        const client = await getModbusTcpClient();
+
+        const result = await client.writeMultipleCoils(
+            0,
+            new Array(2040).fill(true)
+        );
+
+        console.log(result.toJSON())
+
+        expect(result.startingAddress === 0 && result.quantity === 2000).toBeTruthy()
+
+    });
+
     it('writeHoldingRegister', async () => {
 
         const client = await getModbusTcpClient();
